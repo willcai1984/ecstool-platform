@@ -1,0 +1,1522 @@
+#summary One-sentence summary of this page.
+#labels 服务器集群,测试平台,测试框架,自动化测试
+
+= Introduction =
+
+集群式自动化测试框架（平台）设计与实现
+
+
+= Details =
+
+目录
+
+一、     背景概述
+
+1. 现有特点
+
+2. 分析挖掘
+
+3. 突破启发
+
+二、     框架设计概述
+
+三、     完成效果
+
+（一）内容
+
+（二）简要说明
+
+（三）模块操作说明
+
+四、     命令执行引擎帮助手册ExecCommand(string)
+
+（一）命令格式
+
+（二）分类举例
+
+五、     应用于全自动化测试体系的实现实例（基于SVN跨平台敏捷项目）
+
+1．期望实现效果
+
+2. 全局变量和公共函数
+
+3. 版本检查和编译实现函数
+
+4. 启动执行测试函数
+
+5. 测试完成发送邮件和结果链接函数
+
+6. 逻辑流程串联
+
+7. 测试结果效果
+
+六、     其他简单例子
+
+1. 修改远程Windows和Linux服务器配置文件
+
+2. 操作远程Windows服务器的计算器
+
+ 
+
+
+
+ 
+
+一、    背景概述
+
+1.       现有特点
+
+A公司的网络环境是一个比较典型的国内互联网企业结构，如图所示：
+
+
+ 
+
+
+2.       分析挖掘
+
+假设该公司的项目产品及其服务器集群有如下基本特点
+
+
+3.       突破启发
+
+要满足这些特点和要求，要是能设计开发出这么一个产品就好了：能将所有服务器通过自定义方式连接起来（即作为一个或几个集群），只在某一个节点就能够方便地对集群中每一个节点作尽可能多的操作。功能有点类似STAF，并增强其安全和性能，支持Windows、Linux平台；支持公网、私网复合网络；本地及远程命令引擎；文件批量发送下载；自动化脚本任务定制；动态插件扩展；工具平台集成；可作为自动化框架应用于服务器群的自动化管理维护和自动化测试等。参照下图所示：
+
+
+二、    框架设计概述
+
+（1） 网络共享通信少不了，考虑到易用性，Windows平台网络通信方面做成STAF模式：对等式（对用户而言不论客户机还是服务机就一个安装包，显式不区分Client与Server，当然内部Client与Server实现模块均集成）。考虑到是多服务机，也可能是多客户机，即多对多，需要较好的处理性能（当然性能要求也不是特别严格，不需要支持海量在线），那么Client与Server均采用异步通信模式、线程池处理包队列。
+
+ 
+
+（2） 既然对象是针对服务器，肯定少不了Linux，所以Windows、Linux平台均需要支持。Windows采用网络编程，Linux通过SSH协议通信，这样成本比较小、容易实现。Linux操作一样采用线程池处理包队列。
+
+ 
+
+（3） Linux Shell命令是Linux服务器操作的主要方式，通过SSH通道都能实现，Windows的Dos命令同样得实现支持，这样命令式操作服务器就没问题了。可是需要调用执行shell脚本文件、bat脚本文件或者其他程序、其他脚本呢？还有文件操作、文件传输？如果要实现一些复杂的批量任务，比如自动更新服务器程序、自动安装部署、服务器管理维护等，这些统统都是需要实现的基本功能，每个基本功能都实现命令式调用接口，形成一个内部命令执行引擎。
+
+ 
+
+（4） 接上一点，单机既然能够实现一些复杂的批量任务了，那么这单机的逐个任务的一些先后顺序和逻辑条件，谁来控制？还有是多服务器，各个服务机（Windows和Linux）之间若存在相关先后顺序和逻辑条件，谁来控制？那么就必须支持动态语言了，嵌入一种或几种脚本解析器，使用脚本语言来控制这些逻辑是比较明智的，而且能达到不同程度的自动化效果。（自动化程度取决于框架功能和脚本的结合，脚本实现不了的特定功能需要不断丰富并开放接口给脚本内调用。）
+
+ 
+
+（5） 安全方面：STAF都有信任等级区分，所以并不是所有机器安装有程序就能互连操作，还是需要自定义一个校验值（token），校验错误的连接不上，校验正确方可互连操作。请求方（客户机）加密存储，被请求方（服务机）明文配置（便于查看）。除了文件流，网络通信包均加密传输，即使被抓包工具截获也无法获取信息。Windows可以自设token，Linux的登录用户名和密码就视作为token。
+
+ 
+
+（6） 平台化扩展考虑（设计模式应用）：Eclipse和Staf都能提供API支持插件或服务开发，那么仿照此功能，能够开放一些API作为二次插件开发，就可以不断累积集成一个平台，集思广益实现各种各样的内部功能。一些常用单机程序（Windows）扔进目录，可在界面中显示和点击实现外部调用，也算一个桌面工具条式平台。
+
+ 
+
+（7） 网络支持：局域网、ADSL拨号网络、公网等网络进行网络通信和文件传输时需区别对待，区分局域网IP（私网）、对外公网IP、网络出口IP等，局域网内不通过公网直接通信效率更高，ADSL家庭办公就只能通过出口IP和公网IP连接了（延伸VPN等原理）。对用户而言，通过什么网络路径连接都是没有区别的，能够并存，除了速度外操作没有差异。 
+
+ 
+
+（8） 基本的美观性易用性考虑，Windows、Linux服务器操作界面一样，各种操作对用户而言差异化最小。
+
+ 
+
+三、    完成效果
+
+
+（一）内容
+
+1. 开源工程代码：工程源代码（C#），可用Visual Studio加载项目。
+
+2. 发布软件版本： 绿色自解压安装包，解压完成启动.net4.0在线安装（如果已安装.net framwork4.0可取消），点击桌面快捷方式“服务器集群管理平台”则可启动主程序ECSTOOL.exe
+
+ 
+
+（二）简要说明
+
+1.  需要环境 
+
+.NET Framework4.0或以上（Windows）；SSH服务（Linux）
+
+ 
+
+2.  集群部署 
+
+Windows开启本程序（对等，token校验），Linux开启SSH服务（协议）。
+
+ 
+
+3. 应用说明
+
+（1）引用PlugsRoot.dll，动态dll插件开发，放到Plugs目录下即可加载：
+
+using PlugsRoot;
+
+[PluginInfo("动态插件名", "1.0.0.1", "作者", "分组", false)]
+
+public partial class PlugForm : PlugRoot
+
+ 
+
+可调用接口application：
+
+StatusStrip MyStatusStrip { get; }
+
+DockPanel MyDockPanel { get; }
+
+ArrayList aReturn { get; }
+
+string HomePath { get; }
+
+string CronPath { get; }
+
+void AddCommand(string cmdStr);
+
+如：application.AddCommand(“127.0.0.1:get_connect_server{@@}”);
+
+ 
+
+（2）Lua虚拟机注册内置接口函数ExecCommand(string)、内置主窗体对象MyForm,执行时脚本内入口出口函数EnterBegin(),实例如：
+
+--内置ExecCommand(string)函数示例:执行dos和shell命令
+
+ExecCommand("localhost,127.0.0.1:win_cmd{@cd .. && dir@}{@c: && dir@}")
+
+ExecCommand("42.121.98.7:linux_shell{@cd .. && ls -al@}{@netstat -ant|grep 22@}")
+
+--内置主窗体对象MyForm
+
+str = MyForm.scriptText
+
+--脚本入口和出口函数EnterBegin()
+
+function EnterBegin()
+
+local i = 0
+
+local sum=0
+
+while (i <= 100) do
+
+--coroutine.yield( i )
+
+sum = sum + i
+
+i = i + 1
+
+end
+
+if str ~= "" then
+
+return "{\n"..str.."\n}\nresult:"..sum
+
+else
+
+return "WuGang: Hello World!",54321,"END"
+
+end
+
+end
+
+return "WuGang: Hello World!",54321,"END"
+
+ 
+
+4. ECSTOOL.exe.config配置说明
+
+<?xml version="1.0"?>
+
+<!--……-->
+
+<!--服务器端口（默认18888）-->
+
+<setting name="ServerPort" serializeAs="String">
+
+<value>18888</value>
+
+</setting>
+
+<!--文件发送端口（默认私网18889，公网19990）-->
+
+<setting name="SenderPort" serializeAs="String">
+
+<value>18889</value>
+
+</setting>
+
+<!--windows校验值，匹配才能建立连接-->
+
+<setting name="Token" serializeAs="String">
+
+<value>secure token</value>
+
+</setting>
+
+<!--是否服务器（若为False则默认不开启服务器监听）-->
+
+<setting name="IsServer" serializeAs="String">
+
+<value>True</value>
+
+</setting>
+
+<!--是否加密传输（公网True私网False）-->
+
+<setting name="IsEncry" serializeAs="String">
+
+<value>False</value>
+
+</setting>
+
+<!—以下为邮件服务配置-->
+
+<setting name="SMTPServer" serializeAs="String">
+
+<value>smtp.163.com</value>
+
+</setting>
+
+<setting name="SMTPServerUser" serializeAs="String">
+
+<value>demo_db@163.com</value>
+
+</setting>
+
+<setting name="SMTPServerPassword" serializeAs="String">
+
+<value>******</value>
+
+</setting>
+
+<!—默认接收邮箱-->
+
+<setting name="ToNames" serializeAs="String">
+
+<value>wugang@nhn.com</value>
+
+</setting>
+
+ 
+
+5. ServerETC.lst服务器配置说明
+
+# 6个字段（分号分隔）
+
+# IP; 分组; 系统类型（0-Linux,1-Windows);[ssh端口](Linux) [Server端口 & Sender端口](Windows); [用户名 & 密码 ](Linux 加密) [token] (windows); 共享根目录 
+
+127.0.0.1; TOOL; 1; 18888 & 18889; 188AAEB27BC569F3A3C9B12558DDC90E; C:\
+
+42.121.98.70;TEST;1;18888&18889;188AAEB27BC569F3A3C9B12558DDC90E;C:\Debug
+
+42.121.98.7;TEST;0;22;786BF29CB1F70CEA949DD1C6ABF47304;/home
+
+ 
+
+6. crontab.lst定时任务配置（分|时|日|月|星期|命令）
+
+*|*|*|*|*|get_all_servers{@@}
+
+0,59|*|*|*|*|10.34.135.154:get_connect_servers{@@}
+
+ 
+
+7. 目录结构说明
+
+Docs（文档目录）
+
+Log（日志目录）
+
+Plugs（插件和工具目录）
+
+Scripts（脚本目录）
+
+nginx （NginxWeb容器目录）
+
+Groups（项目分组目录）
+
+Temp（临时文件目录）
+
+ 
+
+（三）模块操作说明
+
+1. 【服务器集群列表】窗口
+
+a. 全部连接：全部未连接服务器，Windows通过本工具建立网络互连，Linux建立SSH连接。
+
+b. 全部断开：全部已建立连接的服务器断开连接状态。
+
+c. 重载：新增、删除服务器，或修改配置文件ServerETC.lst后重新载入。
+
+（以下不选、单选、多选，点击【右键菜单】操作）
+
+d. 连接（选中点击右键显示，未连接有效）：所有选中的服务器Windows通过本工具建立网络互连，Linux建立SSH连接。
+
+e. 断开（选中点击右键显示，已连接有效）：所有选中的服务器已建立连接的服务器断开连接状态。
+
+f. 发送文件（选中点击右键显示，已连接有效）：打开【文件传输服务】窗口，并传入必要发送参数。
+
+g. 下载文件（选中点击右键显示，已连接有效）：打开【文件传输服务】窗口，并传入必要下载参数。
+
+h. 执行命令（选中点击右键显示，已连接有效）：打开【命令执行引擎】窗口，并传入所有选中的服务器IP作为执行对象。
+
+i. 新增服务器（选中点击右键显示）：显示新增服务器选项，添加Windows或Linux服务器配置参数。
+
+j. 删除服务器（选中点击右键显示）：本次删除选中服务器（临时删除），重载会显示，通过命令或修改ServerETC.lst彻底删除。
+
+ 
+
+2. 【文件传输服务】窗口
+
+a. 本地和服务器之间文件传输，一个文件可同时从本地分发到多个IP多个路径，一个文件可从远程IP同时下载到本地多个路径下，添加后提交执行。
+
+b. 一次只能针对“一个文件”执行“分发或下载之一”任务，执行完毕后方可执行下一次批量任务。
+
+c. 可保存导出任务列表（分发IP和目录，下载目录），下一次直接导入任务提交执行（文件自选或输入）。
+
+d. 文件或目录路径可从下拉框选择（加载的默认深度为2层），也可自行输入路径。
+
+ 
+
+3. 【命令执行引擎】窗口
+
+a. ECSTOOL.exe.config文件配置项IsServer为True会输出显示信息和所有收到待处理信息，为False仅输出显示信息。（客户端工具建议配置IsServer为False非服务器）
+
+b. 可指定多个连接状态的远程服务器执行linux shell命令（保持管道执行）、执行windows dos命令（每条初始化管道执行）、工具内置命令（包括所有主要功能的命令式）。
+
+c. Lua脚本执行引擎（加载打开、保存、解析执行、停止执行，可命令式调用）
+
+所有主要功能操作组合 + 脚本逻辑 = 自动化任务脚本。
+
+Lua虚拟机注册内置接口函数ExecCommand(string)、内置主窗体对象MyForm,执行时脚本内入口出口函数EnterBegin(),实例如：
+
+--内置ExecCommand(string)函数示例:执行dos和shell命令
+
+ExecCommand("localhost,127.0.0.1:win_cmd{@cd .. && dir@}{@c: && dir@}")
+
+ExecCommand("42.121.98.7:linux_shell{@cd .. && ls -al@}{@netstat -ant|grep 22@}")
+
+ 
+
+4. 【插件工具集】窗口
+
+a. 引用PlugsRoot.dll，动态dll插件开发，放到Plugs目录下即可加载，双击打开嵌入的功能窗口。
+
+using PlugsRoot;
+
+[PluginInfo("动态插件名", "1.0.0.1", "作者", "分组", false)]
+
+public partial class PlugForm : PlugRoot
+
+b. 独立exe工具放置到Plugs目录下即可加载，双击独立运行启动。
+
+ 
+
+5.【使用帮助】
+
+使用帮助说明（一般使用说明和配置结构说明）
+
+命令执行引擎（所有实现命令帮助手册）
+
+ 
+
+6. 【Nginx操作】
+
+Nginx的停止、启动和进入主页。
+
+ 
+
+7. 【HelpAbout】
+
+程序版本、作者联系方式、必要说明等信息。
+
+四、    命令执行引擎帮助手册ExecCommand(string)
+
+（一）命令格式
+
+IP1,IP2,…:command_type{@command1@}{@command2@}…
+
+IP1:IP2:…:command_type{@command1@}{@command2@}…
+
+(:传递执行)
+
+ 
+
+（二）分类举例
+
+ 
+
+1. 执行linux shell命令（保持连接执行）：
+
+IP1,IP2,…:linux_shell{@shell1@}{@shell2@}…
+
+例：42.121.98.7:linux_shell{@cd ..&&ll@}{@ps -aux@}
+
+ 
+
+2. 执行windows命令（每条初始化连接执行）：
+
+IP1,IP2,…:win_cmd{@dos1@}{@dos2@}…
+
+例：42.121.98.70:win_cmd{@cd ..&&dir@}
+
+ 
+
+3. 打开文件（windows）：
+
+IP1,IP2,…:open_file{@path1@}{@path2@}…
+
+例：127.0.0.1:open_file{@D:\[CN]MessengerGuide.ppt@}{@D:\Office 配置指南\outlookurl.txt@}
+
+127.0.0.1:open_file{@D:\[CN]MessengerGuide.bat param1@}
+
+ 
+
+4. 打开网站（windows）：
+
+IP1,IP2,…:open_web{@url1@}{@url2@}…
+
+例：127.0.0.1:open_web{@www.baidu.com@}{@www.163.com@}
+
+ 
+
+5. 打开可执行程序（windows）：
+
+IP1,IP2,…:open_exe{@path1|param2@}{@path1|param2@}…
+
+例：127.0.0.1:open_exe{@C:\Windows\System32\notepad.exe|D:\Office 配置指南\outlookurl.txt@}
+
+127.0.0.1:open_exe{@D:\[CN]MessengerGuide.bat;param1@}
+
+ 
+
+6. 杀掉进程（windows）：
+
+IP1,IP2,…:kill_proc{@proc1@}{@proc2@}…
+
+例：127.0.0.1:kill_proc{@notepad@}
+
+ 
+
+7. 执行Windows API：
+
+IP1,IP2,…:win_api{@proc1|send_text_xy|x|y|string@}{@proc2|send_text|id|string@}{@proc3|click|id@}{@proc4|click_xy|x|y@}{@proc5|send_key|key@}{@proc6|get_byid|id@}{@proc7|set_max@}{@proc8|set_min@}{@proc9|set_normal@}{@proc9|set_front@}{@proc10|get_text|id@}…
+
+例：127.0.0.1:win_api{@notepad|send_text|15|wugang,hello world!@}{@notepad|get_text|15@}
+
+ 
+
+8. 打开Lua脚本：
+
+IP1,IP2,…:open_lua{@path1@}{@path2@}…
+
+例：127.0.0.1:open_lua{@D:\Sample.lua@}
+
+ 
+
+9. 执行Lua脚本：
+
+IP1,IP2,…:exec_lua{@path1@}{@path2@}…
+
+例：127.0.0.1:exec_lua{@D:\Sample.lua@}
+
+ 
+
+10. 停止执行Lua脚本：
+
+IP1,IP2,…:stop_lua{@@}
+
+例：127.0.0.1:stop_lua{@@}
+
+ 
+
+11. 得到连接状态的服务器（在线）：
+
+IP1,IP2,…:get_connect_servers{@all@}{@server@}{@client@}{@linux@}…
+
+例：127.0.0.1:get_connect_servers{@all@}
+
+ 
+
+12：得到未连接状态的服务器（离线）：
+
+IP1,IP2,…:get_noconnect_servers{@@}
+
+例：127.0.0.1: get_noconnect_servers{@@}
+
+ 
+
+13：得到所有服务器IP：
+
+IP1,IP2,…:get_all_servers{@@}
+
+例：127.0.0.1: get_all_servers{@@}
+
+ 
+
+14. 连接所有服务器：
+
+IP1,IP2,…:connect_all_servers{@@}
+
+例：127.0.0.1: connect_all_servers{@@}
+
+ 
+
+15. 连接单个服务器：
+
+IP1,IP2,…:connect_one_server{@IP_1@}{@IP_2@}…
+
+例：127.0.0.1:connect_one_server{@42.121.98.7@}{@42.121.98.70@}
+
+ 
+
+16. 断开所有服务器：
+
+IP1,IP2,…:close_all_servers{@@}
+
+例：127.0.0.1: close_all_servers{@@}
+
+ 
+
+17. 断开单个服务器：
+
+IP1,IP2,…:close_one_server{@IP_1@}{@IP_2@}…
+
+例：127.0.0.1:close_one_server{@42.121.98.7@}{@42.121.98.70@}
+
+ 
+
+18. 得到单个服务器连接状态：
+
+IP1,IP2,…:get_status_server{@IP_1@}{@IP_2@}…
+
+例：127.0.0.1: get_status_server{@42.121.98.7@}{@42.121.98.70@}
+
+ 
+
+19. 删除一个服务器（彻底删除）：
+
+IP1,IP2,…:delete_one_server{@IP_1@}{@IP_2@}…
+
+例：127.0.0.1: delete_one_server {@10.34.130.45@}
+
+ 
+
+20. 检查windows文件是否存在（返回大小）：
+
+IP1,IP2,…:check_windows_file{@path1|minSize1|timeout1@}{@path2|minSize2|timeout2@}…
+
+例：127.0.0.1: check_windows_file{@ D:\Office 配置指南\outlookurl.txt|1|100@}
+
+ 
+
+21. 检查windows目录是否存在：
+
+IP1,IP2,…:check_windows_directory{@path1@}{@path2@}…
+
+例：127.0.0.1: check_windows_directory {@ D:\Office 配置指南@}
+
+ 
+
+22. 检查linux文件是否存在（返回大小）：
+
+IP1,IP2,…:check_linux_file{@path1|minSize1|timeout1@}{@path2|minSize2|timeout2@}…
+
+例：42.121.98.7: check_linux_file{@/root/wugang/wug.txt|10|100@}
+
+ 
+
+23. 检查linux目录是否存在：
+
+IP1,IP2,…:check_linux_directory{@path1@}{@path2@}…
+
+例：42.121.98.7: check_linux_ directory {@~/home@}
+
+ 
+
+24. 得到windows子目录（深度n）：
+
+IP1,IP2,…:get_windows_directories{@n|path1 @}{@n|path2 @}…
+
+例：127.0.0.1: get_windows_directories{@2|D:\ @}
+
+ 
+
+25. 得到windows子文件（深度n）：
+
+IP1,IP2,…:get_windows_files{@n|path1 @}{n|@path2 @}…
+
+例：127.0.0.1: get_windows_filies{@2|D:\ @}
+
+ 
+
+26. 发送windows文件（私网）：
+
+IP1,IP2,…:send_windows_file{@filePath1>IP1?IP1_dir1?IP1_dir2?…|IP2?IP2_dir1?IP2_dir2?…|…@}{@filePath2>IP1?IP1_dir1?IP1_dir2?…|IP2?IP2_dir1?IP2_dir2?…|…@}…
+
+例：127.0.0.1: send_windows_file{@ F:\python核心编程.pdf>127.0.0.1?C:\CWM\firefox fire?C:\CWM@}
+
+ 
+
+26. 发送net文件（公网）：
+
+IP1,IP2,…:send_net_file{@filePath1>IP1?IP1_dir1?IP1_dir2?…|IP2?IP2_dir1?IP2_dir2?…|…@}{@filePath2>IP1?IP1_dir1?IP1_dir2?…|IP2?IP2_dir1?IP2_dir2?…|…@}…
+
+例：42.121.98.70: send_net_file{@ F:\python核心编程.pdf>C:\Debug?C:\Debug\Docs@}
+
+ 
+
+27. 下载windows文件：
+
+IP1,IP2,…:download_windows_file{@IP_1>filePath1>IP1_dir1?IP2_dir2? … @}{@ IP_2>filePath2|IP1_dir1?IP1_dir2?…@}…
+
+例:127.0.0.1: download_windows_file{@42.121.98.70>C:\Debug\python核心编程.pdf>C:\CWM\firefox fire?C:\CWM@}
+
+ 
+
+28. 发送Linux文件：
+
+IP1,IP2,…:send_linux_file{@filePath1>IP1;IP1_dir1?IP1_dir2?…|IP2;IP2_dir1?IP2_dir2?…|…@}{@filePath2>IP1;IP1_dir1?IP1_dir2?…|IP2;IP2_dir1?IP2_dir2?…|…@}…
+
+例：127.0.0.1: send_linux_file{@C:\CWM\wug.txt>42.121.98.7;/home?/root/wugang@}
+
+ 
+
+29. 下载Linux文件：
+
+IP1,IP2,…:download_linux_file{@IP_1|file1|IP1_dir1?IP1_dir2?…@}{@IP_2|file2|IP1_dir1?IP1_dir2?…@}…
+
+例:127.0.0.1: download_linux_file{@42.121.98.7|/root/wug.txt|C:\CWM?C:\CWM\firefox fire@}
+
+ 
+
+30. 关闭所有文件发送线程：
+
+IP1,IP2,…: close_send_file{@@}
+
+例：127.0.0.1: close_send_file{@@}
+
+ 
+
+31. 关闭所有文件下载线程：
+
+IP1,IP2,…: close_download_file{@@}
+
+例：127.0.0.1: close_download_file{@@}
+
+ 
+
+32. 替换文本字符串右边的值（逐行）：
+
+IP1,IP2,…:replace_right{@file1|left1|right1@}{@file1|left1|right1@}…
+
+例：127.0.0.1: replace_right{@ C:\CWM\wug.txt|xxx=|www.baidu.com@}
+
+ 
+
+33. 替换文本字符串：
+
+IP1,IP2,…:replace_text{@file1|old1|new1@}{@file2|old2|new2@}…
+
+例：127.0.0.1: replace_text{@ C:\CWM\wug.txt|yyy=|zzz=@}
+
+ 
+
+34. 添加定时任务：
+
+IP1,IP2:con_add[[min|hour|day|month|week|command]]…
+
+例：127.0.0.1:cron_add[[*|*|*|*|*|10.34.130.44:exec_lua{@Groups/Project/email.lua@}]]
+
+ 
+
+35. 删除定时任务：
+
+IP1,IP2:con_del[[min|hour|day|month|week|command]]…
+
+例：127.0.0.1:cron_del[[*|*|*|*|*|10.34.130.44:get_all_servers{@@}]]
+
+ 
+
+36. 发送邮件：
+
+IP1,IP2:send_mail{@to1;to2;to3|cc1;cc2|subject|body|true@}…
+
+例：127.0.0.1:send_mail{@workhard_smile@163.com;wugang@nhn.com|wugang@nhn.com|测试|<html>测试<br />test</html>|true@}
+
+ 
+
+37. 查看文本文件：
+
+IP1,IP2: view_file{@file1@}{@file2@}…
+
+例：127.0.0.1:view_file{@crontab.lst@}{@C:\root.txt@}
+
+ 
+
+38. 强制等待执行CMD：
+
+IP1,IP2:run_cmd{@command1@}{@command2@}…
+
+例：127.0.0.1: run_cmd{@ping –n 10 127.0.0.1@}…
+
+ 
+
+39. 输出窗口：
+
+IP1,IP2: out_put{@content1@}{@ content1@}…
+
+例：127.0.0.1: out_put{@Hello world!@}
+
+ 
+
+五、    应用于全自动化测试体系的实现实例（基于SVN跨平台敏捷项目）
+
+1．期望实现效果
+
+开发会将用于测试的源代码版本转存于SVN的一个路径下。
+
+无人值守自动实施工作：每天固定几个时间段检查一次是否有新的需要测试的版本。
+
+如果有： 【则下载源代码到各个Windows和Linux编译环境平台进行编译，编译成功后部署到相应的Windows和Linux测试服务器，然后启动自动化测试脚本或程序，测试完成后发送Summary邮件和测试报告网址。】
+
+如果没有或者过程中有错：【中止测试，发送Summary邮件和错误日志。】
+
+即，中控服务器自动定时任务：检查版本à多平台多服务器同时编译à多服务器同时部署à调用启动测试à测试结束展现测试结果（如自动发送邮件网页等）
+
+手动工作：本地编写自动化测试代码+维护一套自动控制脚本-->接收邮件、检查测试结果
+
+总之，自动化中控服务器平台执行控制脚本逻辑、调度操控各个可连接服务器有序工作（横向纵向可继续延伸至其他中控集群），本地工作机可一键生成同步资源到中控服务器（基于IP），一键增删查中控服务器定时任务列表（相对路径，控制脚本调度）。如图所示本地资源列表界面：
+
+
+2.       全局变量和公共函数
+
+wip="10.33.33.63"  --windows
+
+lip="10. 33.33.44"  --linux
+
+lhost="10. 33.33.62"  --中控
+
+tlpath="/tmp/"
+
+twpath="C:\\ECSTOOL\\Temp\\"
+
+dates=os.date("%Y-%m-%d")
+
+cfile="C:\\ECSTOOL\\Groups\\CWMCMS\\0CheckVersion\\current"
+
+tfile="C:\\ECSTOOL\\Groups\\CWMCMS\\0CheckVersion\\test"
+
+-----------------日志记录---------------------------
+
+LogPath="C:\\ECSTOOL\\Log\\CMS."..dates..".log"
+
+function WriteLog(str)
+
+local ft = assert(io.open(LogPath, "a")) 
+
+ft:write(str.."<br />\r\n") 
+
+ft:close()
+
+end
+
+----------------sleep(n)和sleeping(n)------------------
+
+--利用系统ping命令等待时间
+
+function sleep(n) 
+
+  if n > 0 then os.execute("ping -n " .. tonumber(n + 1) .. " localhost > NUL") end 
+
+end
+
+function sleeping(n)
+
+  local i = 0
+
+  local x = 100000*n
+
+  while i < x do
+
+     i = i + 1
+
+  end
+
+end
+
+---------------------connect(IP)返回1成功0失败--------------
+
+--建立连接
+
+function connect(tip)
+
+ local sip="127.0.0.1"
+
+ --连接服务器
+
+ ExecCommand(sip..":connect_one_server{@"..tip.."@}")
+
+ local count=0
+
+ while count<1000 do 
+
+  sleep(1)
+
+  ExecCommand(sip..":get_status_server{@"..tip.."@}")
+
+  --寻找子字符串，可用正则
+
+  local s, e = string.find(string.lower(MyForm.hReturn[MyForm.hReturn.Count-1]),"true",1)
+
+  if (e ~= nil) and (s ~= nil) and (e > s) then 
+
+     x = string.sub(MyForm.hReturn[MyForm.hReturn.Count-1], s, e) 
+
+     return 1
+
+  end 
+
+  count = count+1
+
+ end
+
+ return 0
+
+end
+
+------------------------------------------------------------------------------------------------
+
+3.       版本检查和编译实现函数
+
+开发会将用于测试的源代码版本转存于SVN的一个路径下。定时检查这个路径下是否有新增版本，有的话下载—>启动测试流程—>测试结束标记已测试（用于下次检查避免重复测试），如果需要回归测试只需编辑标记测试文件。0CheckVersion\current和0CheckVersion\test文件
+
+编译打包脚本和开发一起协调完成，编译调度脚本为1Build\ packagebuild_new.sh和1Build\ packagebuild_new.sh，安装部署脚本为2Setup\setup.sh和2Setup\setup.bat，在检查版本需要测试后，均需要从中控服务器分发到Linux和Windows编译服务器和测试服务器。
+
+
+-------------------------------------------CheckVersion(style) -----------------------
+
+-------------------------------------------- style:both;win;linux----------------------
+
+function CheckVersion(style)
+
+local url="http://svn.cubrid.org/cubridtools/cm-server/branches/"
+
+local build="C:\\ECSTOOL\\Groups\\CWMCMS\\1Build\\"
+
+local setpath="C:\\ECSTOOL\\Groups\\CWMCMS\\2Setup\\"
+
+local lbuild="packagebuild_new.sh"
+
+local wbuild="packagebuild_new.bat"
+
+local version=nil
+
+ExecCommand(lhost..":open_file{@svn list "..url..">"..cfile.."@}")
+
+sleep(10)
+
+--读已测版本列表
+
+local ft = assert(io.open(tfile, "r")) 
+
+local tt = ft:read("*all") 
+
+ft:close()
+
+tt=string.gsub(string.gsub(tt,"\n",""),"/","")
+
+--读当前版本列表
+
+local fc = assert(io.open(cfile, "r")) 
+
+local tc = fc:read("*all") 
+
+fc:close()
+
+tc=string.gsub(string.gsub(tc,"\n",""),"/","")
+
+--比较获取需要测试版本
+
+if tc == tt then 
+
+  return version,tc
+
+else
+
+  tt=string.gsub(string.gsub(tt,"%.","%%."),"%-","%%-")
+
+  version=string.gsub(tc,tt,"")
+
+  --windows和linux同时操作
+
+  if style == "both" then
+
+    --删除上次脚本
+
+    ExecCommand(wip..":win_cmd{@cd "..twpath.." &&del /F /Q "..wbuild.." && del /F /Q setup.bat@}")
+
+    ExecCommand(lip..":linux_shell{@cd "..tlpath.." &&rm -fr "..lbuild.." setup.sh@}")
+
+    sleep(5)
+
+    --分发脚本build
+
+    ExecCommand(lhost..":send_windows_file{@"..build..wbuild..">"..wip.."?"..twpath.."?@}")
+
+    sleep(1)
+
+    ExecCommand(lhost..":send_linux_file{@"..build..lbuild..">"..lip..";"..tlpath.."?@}")
+
+    sleep(10)
+
+    --分发脚本setup
+
+    ExecCommand(lhost..":send_windows_file{@"..setpath.."setup.bat>"..wip.."?"..twpath.."?@}")
+
+    sleep(1)
+
+    ExecCommand(lhost..":send_linux_file{@"..setpath.."setup.sh>"..lip..";"..tlpath.."?@}")
+
+    sleep(10)
+
+    --迁出编译
+
+    ExecCommand(wip..":open_exe{@"..twpath..wbuild..";"..version.."@}")
+
+    ExecCommand(lip..":linux_shell{@cd "..tlpath.." &&sh "..lbuild.." "..version.."@}")
+
+    sleep(10)
+
+  --只操作windows
+
+  elseif style == "win" then
+
+    --删除上次脚本
+
+    ExecCommand(wip..":win_cmd{@cd "..twpath.." &&del /F /Q "..wbuild.."@}")
+
+    sleep(5)
+
+    --分发脚本
+
+    ExecCommand(lhost..":send_windows_file{@"..build..wbuild..">"..wip.."?"..twpath.."?@}")
+
+    sleep(10)
+
+    --迁出编译
+
+    ExecCommand(wip..":open_exe{@"..twpath..wbuild..";"..version.."@}")
+
+    sleep(10)
+
+  --只操作linux
+
+  else
+
+    --删除上次脚本
+
+    ExecCommand(lip..":linux_shell{@cd "..tlpath.." &&rm -fr "..lbuild.."@}")
+
+    sleep(5)
+
+    --分发脚本
+
+    sleep(1)
+
+    ExecCommand(lhost..":send_linux_file{@"..build..lbuild..">"..lip..";"..tlpath.."?@}")
+
+    sleep(10)
+
+    --迁出编译
+
+    ExecCommand(lip..":linux_shell{@cd "..tlpath.." &&sh "..lbuild.." "..version.."@}")
+
+    sleep(10)
+
+  end
+
+  return version,tc
+
+end
+
+end
+
+------------------------------------------------------------------------------------------------
+
+4.       启动执行测试函数
+
+包括测试环境准备（打包资源文件Temp\TestReady.zip分发到Linux和Windows服务器后解压覆盖），自动化测试程序调用方式：ExecCommand(lhost..":open_file{@cd C:\\ECSTOOL\\Groups\\CWMCMS\\3Test\\testexe-windows && CMSAutoTest.exe -p "..ver.." -h "..wip.."@}")
+
+---------------------------------------ExecuteTest(ver,style) -------------------------
+
+----------------------------------------style:both;win;linux----------------------------
+
+function ExecuteTest(ver,style)
+
+--变量
+
+local lpath="/root/CUBRID/bin/"
+
+local wpath="C:\\CUBRID\\bin\\"
+
+local rpath="C:\\ECSTOOL\\Temp\\TestReady.zip"
+
+local rar="%ProgramFiles%/WinRAR/WinRAR.exe"
+
+local file="TestReady.zip"
+
+ExecCommand(lhost..":kill_proc{@cmd@}{@CMSAutoTest@}")
+
+sleep(5)
+
+if style == "both" then
+
+  ---------------------测试环境准备-----------------------
+
+  WriteLog("["..os.date("%x %X").."] Set the testing ENV...")
+
+  ExecCommand(wip..":win_cmd{@cd "..wpath.." && cubrid.exe service restart@}")
+
+  ExecCommand(lip..":linux_shell{@cubrid service restart && cubrid server start demodb@}")
+
+  sleep(10)
+
+  ExecCommand(wip..":win_cmd{@cd "..wpath.." && cubrid.exe server start demodb@}")
+
+  sleep(5)
+
+  --清理压缩包
+
+  ExecCommand(wip..":win_cmd{@cd "..wpath.." && del /f /q "..file.."@}")
+
+  ExecCommand(lip..":linux_shell{@cd "..lpath.." && rm -fr "..file.."@}")
+
+  sleep(5)
+
+  --分发压缩包
+
+  ExecCommand(lhost..":send_windows_file{@"..rpath..">"..wip.."?"..wpath.."?@}")
+
+  sleep(10)
+
+  ExecCommand(lhost..":send_linux_file{@"..rpath..">"..lip..";"..lpath.."?@}")
+
+  sleep(10)
+
+  --解压
+
+  ExecCommand(wip..":win_cmd{@cd "..wpath.." && \""..rar.."\" x -r -o+ "..file.." .@}")
+
+  ExecCommand(lip..":linux_shell{@cd "..lpath.." && unzip -o "..file.."@}")
+
+  sleep(10)
+
+  -----------------------执行测试-----------------------------
+
+  WriteLog("["..os.date("%x %X").."] Excute testing...")
+
+  ExecCommand(lhost..":open_file{@cd C:\\ECSTOOL\\Groups\\CWMCMS\\3Test\\testexe-windows && CMSAutoTest.exe -p "..ver.." -h "..wip.."@}")
+
+  sleep(1)
+
+  ExecCommand(lhost..":open_file{@cd C:\\ECSTOOL\\Groups\\CWMCMS\\3Test\\testexe-linux && CMSAutoTest.exe -p "..ver.." -h "..lip.."@}")
+
+  sleep(1)
+
+  ------------------------清理环境-----------------------------
+
+  ExecCommand(wip..":win_cmd{@cd "..twpath.." && del /f /q "..ver.." && del /f /q CMS* && del /f /q setup.bat@}")
+
+  ExecCommand(lip..":linux_shell{@cd "..tlpath.." && rm -fr "..ver.." CMS* setup.sh@}")
+
+  WriteLog("["..os.date("%x %X").."] Clear testing ENV...")
+
+elseif style == "win" then 
+
+  ---------------------测试环境准备-----------------------
+
+  WriteLog("["..os.date("%x %X").."] Set the testing ENV...")
+
+  ExecCommand(wip..":win_cmd{@cd "..wpath.." && cubrid.exe service restart@}")
+
+  sleep(10)
+
+  ExecCommand(wip..":win_cmd{@cd "..wpath.." && cubrid.exe server start demodb@}")
+
+  sleep(5)
+
+  --清理压缩包
+
+  ExecCommand(wip..":win_cmd{@cd "..wpath.." && del /f /q "..file.."@}")
+
+  sleep(5)
+
+  --分发压缩包
+
+  ExecCommand(lhost..":send_windows_file{@"..rpath..">"..wip.."?"..wpath.."?@}")
+
+  sleep(10)
+
+  --解压
+
+  ExecCommand(wip..":win_cmd{@cd "..wpath.." && \""..rar.."\" x -r -o+ "..file.." .@}")
+
+  sleep(10)
+
+  -----------------------执行测试-----------------------------
+
+  WriteLog("["..os.date("%x %X").."] Excute testing...")
+
+  ExecCommand(lhost..":open_file{@cd C:\\ECSTOOL\\Groups\\CWMCMS\\3Test\\testexe-windows && CMSAutoTest.exe -p "..ver.." -h "..wip.."@}")
+
+  sleep(1)
+
+  ------------------------清理环境-----------------------------
+
+  ExecCommand(wip..":win_cmd{@cd "..twpath.." && del /f /q "..ver.." && del /f /q CMS* && del /f /q setup.bat@}")
+
+  WriteLog("["..os.date("%x %X").."] Clear testing ENV...")
+
+else
+
+  ---------------------测试环境准备-----------------------
+
+  WriteLog("["..os.date("%x %X").."] Set the testing ENV...")
+
+  ExecCommand(lip..":linux_shell{@cubrid service restart && cubrid server start demodb@}")
+
+  sleep(10)
+
+  --清理压缩包
+
+  ExecCommand(lip..":linux_shell{@cd "..lpath.." && rm -fr "..file.."@}")
+
+  sleep(5)
+
+  --分发压缩包
+
+  ExecCommand(lhost..":send_linux_file{@"..rpath..">"..lip..";"..lpath.."?@}")
+
+  sleep(10)
+
+  --解压
+
+  ExecCommand(lip..":linux_shell{@cd "..lpath.." && unzip -o "..file.."@}")
+
+  sleep(10)
+
+  -----------------------执行测试-----------------------------
+
+  WriteLog("["..os.date("%x %X").."] Excute testing...")
+
+  ExecCommand(lhost..":open_file{@cd C:\\ECSTOOL\\Groups\\CWMCMS\\3Test\\testexe-linux && CMSAutoTest.exe -p "..ver.." -h "..lip.."@}")
+
+  sleep(1)
+
+  ------------------------清理环境-----------------------------
+
+  ExecCommand(lip..":linux_shell{@cd "..tlpath.." && rm -fr "..ver.." CMS* setup.sh@}")
+
+  WriteLog("["..os.date("%x %X").."] Clear testing ENV...")
+
+end
+
+end
+
+------------------------------------------------------------------------------------------------
+
+5.       测试完成发送邮件和结果链接函数
+
+----------------------------------sendmail(ver,style) -------------------------------------
+
+----------------------------------style:both;win;linux------------------------------------
+
+function sendmail(ver,style)
+
+--CMS-10.34.130.44/2013-01-10/index.html
+
+local project="CMS-"..ver
+
+local dates=os.date("%Y-%m-%d")
+
+local hpath="http://"..lhost.."/"
+
+local lpath=hpath..project.."-"..lip.."/"..dates.."/index.html"
+
+local wpath=hpath..project.."-"..wip.."/"..dates.."/index.html" 
+
+local receiver="wugang@nhn.com;huxiangwei@nhn.com|qiaohongliang@nhn.com"
+
+local filename,f,t
+
+if style == "both" then
+
+  filename="C:/ECSTOOL/nginx/html/"..project.."-"..lip.."/"..dates.."/index.html"
+
+  f = assert(io.open(filename, "r")) 
+
+  t = f:read("*all") 
+
+  f:close()
+
+  --发送邮件：收件人列表|抄送|主题|正文|是否html
+
+  ExecCommand("127.0.0.1:send_mail{@"..receiver.."|CMS Test Reports In Linux on "..dates.."| URL link:<br /><a href=\""..lpath.."\">"..lpath.."</a><br />"..string.gsub(t,"|","").."|true@}")
+
+  sleep(1)
+
+  filename="C:/ECSTOOL/nginx/html/"..project.."-"..wip.."/"..dates.."/index.html"
+
+  f = assert(io.open(filename, "r")) 
+
+  t = f:read("*all") 
+
+  f:close()
+
+  --发送邮件：收件人列表|抄送|主题|正文|是否html
+
+  ExecCommand("127.0.0.1:send_mail{@"..receiver.."|CMS Test Reports In Windows on "..dates.."| URL link:<br /><a href=\""..wpath.."\">"..wpath.."</a><br />"..string.gsub(t,"|","").."|true@}")
+
+  sleep(1)
+
+elseif style == "win" then
+
+  filename="C:/ECSTOOL/nginx/html/"..project.."-"..wip.."/"..dates.."/index.html"
+
+  f = assert(io.open(filename, "r")) 
+
+  t = f:read("*all") 
+
+  f:close()
+
+  --发送邮件：收件人列表|抄送|主题|正文|是否html
+
+  ExecCommand("127.0.0.1:send_mail{@"..receiver.."|CMS Test Reports In Windows on "..dates.."| URL link:<br /><a href=\""..wpath.."\">"..wpath.."</a><br />"..string.gsub(t,"|","").."|true@}")
+
+  sleep(1)
+
+else
+
+  filename="C:/ECSTOOL/nginx/html/"..project.."-"..lip.."/"..dates.."/index.html"
+
+  f = assert(io.open(filename, "r")) 
+
+  t = f:read("*all") 
+
+  f:close()
+
+  --发送邮件：收件人列表|抄送|主题|正文|是否html
+
+  ExecCommand("127.0.0.1:send_mail{@"..receiver.."|CMS Test Reports In Linux on "..dates.."| URL link:<br /><a href=\""..lpath.."\">"..lpath.."</a><br />"..string.gsub(t,"|","").."|true@}")
+
+  sleep(1)
+
+end
+
+filename="C:\\ECSTOOL\\Log\\CMS."..dates..".log"
+
+f = assert(io.open(filename, "r")) 
+
+t = f:read("*all") 
+
+f:close()
+
+--发送邮件：收件人列表|抄送|主题|正文|是否html
+
+ExecCommand("127.0.0.1:send_mail{@"..receiver.."|CMS Daily Test Log on "..dates.."| URL link:<br /><a href=\""..lpath.."\">"..lpath.."</a><br /><a href=\""..wpath.."\">"..wpath.."</a><br />"..string.gsub(t,"|","").."|true@}")
+
+end
+
+-------------------------------------------------------------------------------------------------------
+
+6.       逻辑流程串联
+
+检查是否有新的需要测试的版本。
+
+如果有： 【则下载源代码到各个Windows和Linux编译环境平台进行编译，编译成功后部署到相应的Windows和Linux测试服务器，然后启动自动化测试脚本或程序，测试完成后发送Summary邮件和测试报告网址。】
+
+如果没有或者过程中有错：【中止测试，发送Summary邮件和错误日志。】
+
+即，中控服务器自动定时任务：检查版本à多平台多服务器同时编译à多服务器同时部署à调用启动测试à测试结束展现测试结果（如自动发送邮件网页等）
+
+--------------------------------------Follow(including setup) --------------------------------- 
+
+WriteLog("==================================================")
+
+WriteLog("["..os.date("%x %X").."] Start daily test follow...")
+
+WriteLog("==================================================")
+
+WriteLog("["..os.date("%x %X").."] Connect to windows "..wip.." ...")
+
+wbool=connect(wip)
+
+WriteLog("["..os.date("%x %X").."] Connect to linux "..lip.." ...")
+
+lbool=connect(lip)
+
+WriteLog("==================================================")
+
+WriteLog("["..os.date("%x %X").."] Start to check version and build.")
+
+if (wbool == 1) and (lbool == 1) then  
+
+  v,t=CheckVersion("both")
+
+elseif wbool == 1 then
+
+  v,t=CheckVersion("win")
+
+else
+
+  v,t=CheckVersion("linux")
+
+end
+
+WriteLog("["..os.date("%x %X").."] End to check version and build.")
+
+WriteLog("==================================================")
+
+if v ~= nil then
+
+  --等待编译
+
+  sleep(1800)
+
+  if (wbool == 1) and (lbool == 1) then
+
+    ExecCommand(wip..":win_cmd{@cubrid service stop@}")
+
+    ExecCommand(lip..":linux_shell{@cubrid service stop@}")
+
+    sleep(10)
+
+    ExecCommand(wip..":open_exe{@"..twpath.."setup.bat;"..v.."@}")
+
+    ExecCommand(lip..":linux_shell{@cd "..tlpath.." && sh setup.sh "..v.."@}")
+
+    sleep(200)
+
+    WriteLog("==================================================")
+
+    WriteLog("["..os.date("%x %X").."] Start to execute testing.")
+
+    ExecuteTest(v,"both")
+
+    WriteLog("["..os.date("%x %X").."] End to execute testing.")
+
+    WriteLog("==================================================")
+
+    sleep(4000)
+
+    WriteLog("==================================================")
+
+    WriteLog("["..os.date("%x %X").."] Start to send mail.")
+
+    sendmail(v,"both")
+
+    WriteLog("["..os.date("%x %X").."] End to send mail.")
+
+    WriteLog("==================================================")
+
+  elseif wbool == 1 then
+
+    ExecCommand(wip..":win_cmd{@cubrid service stop@}")
+
+    sleep(10)
+
+    ExecCommand(wip..":open_exe{@"..twpath.."setup.bat;"..v.."@}")
+
+    sleep(200)
+
+    WriteLog("==================================================")
+
+    WriteLog("["..os.date("%x %X").."] Start to execute testing.")
+
+    ExecuteTest(v,"win")
+
+    WriteLog("["..os.date("%x %X").."] End to execute testing.")
+
+    WriteLog("==================================================")
+
+    sleep(4000)
+
+    WriteLog("==================================================")
+
+    WriteLog("["..os.date("%x %X").."] Start to send mail.")
+
+    sendmail(v,"win")
+
+    WriteLog("["..os.date("%x %X").."] End to send mail.")
+
+    WriteLog("==================================================")
+
+  elseif lbool == 1 then
+
+    ExecCommand(lip..":linux_shell{@cubrid service stop@}")
+
+    sleep(10)
+
+    ExecCommand(lip..":linux_shell{@cd "..tlpath.." && sh setup.sh "..v.."@}")
+
+    sleep(200)
+
+    WriteLog("==================================================")
+
+    WriteLog("["..os.date("%x %X").."] Start to execute testing.")
+
+    ExecuteTest(v,"linux")
+
+    WriteLog("["..os.date("%x %X").."] End to execute testing.")
+
+    WriteLog("==================================================")
+
+    sleep(4000)
+
+    WriteLog("==================================================")
+
+    WriteLog("["..os.date("%x %X").."] Start to send mail.")
+
+    sendmail(v,"linux")
+
+    WriteLog("["..os.date("%x %X").."] End to send mail.")
+
+    WriteLog("==================================================")
+
+  end
+
+  local ff = assert(io.open(tfile, "w")) 
+
+  ff:write(t) 
+
+  ff:close()
+
+else   
+
+  WriteLog("["..os.date("%x %X").."] All versions have been tested. Don't need to test!["..t.."]")
+
+  WriteLog("==================================================")
+
+end
+
+WriteLog("==================================================")
+
+WriteLog("["..os.date("%x %X").."] Complete daily test follow...")
+
+WriteLog("==================================================")
+
+return "Complete Test Follow!"
+
+
+
+ 
+
+7.       测试结果效果
+
+
+
+六、    其他简单例子
+
+1. 修改远程Windows和Linux服务器配置文件
+
+   http://blog.csdn.net/w565911788/article/details/8128506
+
+2.  操作远程Windows服务器的计算器
+
+   http://blog.csdn.net/w565911788/article/details/8131101 
