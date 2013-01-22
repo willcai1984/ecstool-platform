@@ -7,17 +7,19 @@
 
 ==（一）命令格式==
 
+{{{
 IP1,IP2,…:command_type{@command1@}{@command2@}…
 
 IP1:IP2:…:command_type{@command1@}{@command2@}…
 
 (:传递执行)
+}}}
 
  
 
 ==（二）分类举例==
 
- 
+ {{{
 
 1. 执行linux shell命令（保持连接执行）：
 
@@ -340,3 +342,4 @@ IP1,IP2:run_cmd{@command1@}{@command2@}…
 IP1,IP2: out_put{@content1@}{@ content1@}…
 
 例：127.0.0.1: out_put{@Hello world!@}
+}}}
