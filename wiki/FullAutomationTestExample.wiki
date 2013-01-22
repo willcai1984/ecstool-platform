@@ -752,7 +752,7 @@ return "Complete Test Follow!"
 }}}
 ==7. 测试结果效果==
 保存上述脚本，配置定时任务:<br />
-0|0,4,8|*|*|*|exec_lua{@C:\ECSTOOL\Groups\CWMCMS\3Test\ExecTestFollow.lua@}
+`0|0,4,8|*|*|*|exec_lua{@C:\ECSTOOL\Groups\CWMCMS\3Test\ExecTestFollow.lua@}`
 
 http://www.itmal.com/images/img/a8.jpg
 http://www.itmal.com/images/img/a9.jpg
