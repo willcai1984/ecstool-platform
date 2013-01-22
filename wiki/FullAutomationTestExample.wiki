@@ -1,7 +1,7 @@
 #summary One-sentence summary of this page.
 #labels 服务器集群,框架平台,自动化测试
 
-= 应用于全自动化测试体系的实现实例（基于SVN跨平台敏捷项目） =
+=应用于全自动化测试体系的实现实例(基于SVN跨平台敏捷项目)=
 
 ==1．    期望实现效果==
 
