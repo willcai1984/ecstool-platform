@@ -19,6 +19,7 @@
 
 总之，自动化中控服务器平台执行控制脚本逻辑、调度操控各个可连接服务器有序工作（横向纵向可继续延伸至其他中控集群），本地工作机可一键生成同步资源到中控服务器（基于IP），一键增删查中控服务器定时任务列表（相对路径，控制脚本调度）。如图所示本地资源列表界面：
 
+http://www.itmal.com/images/img/a6.jpg
 
 ==2.   全局变量和公共函数==
 
@@ -126,6 +127,7 @@ end
 
 编译打包脚本和开发一起协调完成，编译调度脚本为1Build\ packagebuild_new.sh和1Build\ packagebuild_new.sh，安装部署脚本为2Setup\setup.sh和2Setup\setup.bat，在检查版本需要测试后，均需要从中控服务器分发到Linux和Windows编译服务器和测试服务器。
 
+http://www.itmal.com/images/img/a7.jpg
 
 {{{
 -------------------------------------------CheckVersion(style) -----------------------
@@ -749,3 +751,8 @@ WriteLog("==================================================")
 return "Complete Test Follow!"
 }}}
 ==7. 测试结果效果==
+保存上述脚本，配置定时任务:<br />
+0|0,4,8|*|*|*|exec_lua{@C:\ECSTOOL\Groups\CWMCMS\3Test\ExecTestFollow.lua@}
+
+http://www.itmal.com/images/img/a8.jpg
+http://www.itmal.com/images/img/a9.jpg
