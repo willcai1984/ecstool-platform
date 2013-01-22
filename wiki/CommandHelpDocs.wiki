@@ -1,6 +1,7 @@
 #summary One-sentence summary of this page.
 #labels 服务器集群,框架平台,自动化
 
+
 = 命令执行引擎帮助手册ExecCommand(string) =
 
 
@@ -314,7 +315,7 @@ IP1,IP2:con_del[[min|hour|day|month|week|command]]…
 
 IP1,IP2:send_mail{@to1;to2;to3|cc1;cc2|subject|body|true@}…
 
-例：127.0.0.1:send_mail{@workhard_smile@163.com;wugang@nhn.com|wugang@nhn.com|测试|<html>测试<br />test</html>|true@}
+例：127.0.0.1:send_mail{@workhard_smile@163.com;wugang@nhn.com|wugang@nhn.com|测试|<html>测试test</html>|true@}
 
  
 
